@@ -67,7 +67,7 @@ $banner = @"
                                                                                                                                                                                                       
                                                                                                                                                                                                                                 
 "@
-
+$key = 0..255 | Get-Random -Count 32 | %{[byte]$_} 
 ####
 #### Begin Install Modules
 ####
@@ -171,10 +171,14 @@ function Install-RequiredPSModules {
 				$ualanalyzerlocation = "$env:USERPROFILE\Documents\PSScripts\MAS\UAL-Analyzer.ps1"
 				$ADsigninlogsanalyzerlocation = "$env:USERPROFILE\Documents\PSScripts\MAS\ADSignInLogsGraph-Analyzer.ps1"
 				$MTLAnalyzerLocation = "$env:USERPROFILE\Documents\PSScripts\MAS\MTL-Analyzer.ps1"
-				#Enter IPinfo.io token to be saved as a file and later used as a variable (bad secret practice, I know)
-				Read-Host "Enter IP Info Token" | Out-File -FilePath $env:USERPROFILE\Documents\PSScripts\IPinfotoken.txt
-				#Get content of IPinfotoken and store as variable
-				$ipinfotoken = Get-Content $env:USERPROFILE\Documents\PSScripts\IPinfotoken.txt
+
+				$ipinfotoken = Read-Host -AsSecureString -Prompt "Enter IPInfo Token" 
+				$ipinfotokensecure = $ipinfotoken | ConvertFrom-SecureString -key $key 
+				Set-Content -Path $ipinfofilesetget -Value $ipinfotokensecure
+				$encStr = Get-Content $ipinfofilesetget
+				$ipinfotoken = $encStr | ConvertTo-SecureString -Key $key 
+				$ipinfotoken = [System.Net.NetworkCredential]::new("", $ipinfotoken).Password
+
 				#Replace access_token line in scripts that use it with actual token
 				$string = Get-Content $ualanalyzerlocation
 				$string[207] = $string[207] -replace("access_token", "$ipinfotoken")
@@ -211,12 +215,35 @@ function Update-RequiredModules {
 	#Change directory to the analyzer suite
 	Push-Location "$env:USERPROFILE\Documents\PSScripts\MAS"
 	#Set locations as variables
-    	$maslocation = "$env:USERPROFILE\Documents\PSScripts\MAS"
+    $maslocation = "$env:USERPROFILE\Documents\PSScripts\MAS"
 	$UALanalyzerlocation = "$maslocation\UAL-Analyzer.ps1"
 	$ADsigninlogsanalyzerlocation = "$maslocation\ADSignInLogsGraph-Analyzer.ps1"
 	$MTLAnalyzerLocation = "$maslocation\MTL-Analyzer.ps1"
+	
 	#Get content of IPinfotoken and store as variable
-	$ipinfotoken = Get-Content $env:USERPROFILE\Documents\PSScripts\IPinfotoken.txt
+	$ipinfofile = Test-Path -Path "$env:USERPROFILE\Documents\PSScripts\IPinfotoken.encrypted"
+	$ipinfofilesetget = "$env:USERPROFILE\Documents\PSScripts\IPinfotoken.encrypted"
+	if ($ipinfofile) {
+		$encStr = Get-Content $ipinfofilesetget
+		$ipinfotoken = $encStr | ConvertTo-SecureString -Key $key 
+        $ipinfotoken = [System.Net.NetworkCredential]::new("", $ipinfotoken).Password
+		} else {
+		Write-Host "IP Info Token Missing"
+		$ipinfotoken = Read-Host -AsSecureString -Prompt "Enter IPInfo Token" 
+		$ipinfotokensecure = $ipinfotoken | ConvertFrom-SecureString -key $key 
+		Set-Content -Path $ipinfofilesetget -Value $ipinfotokensecure
+		$encStr = Get-Content $ipinfofilesetget
+		$ipinfotoken = $encStr | ConvertTo-SecureString -Key $key 
+        $ipinfotoken = [System.Net.NetworkCredential]::new("", $ipinfotoken).Password
+		}
+	
+
+
+
+
+
+
+
 	#Re-clone the repo after resetting
 	git reset --hard HEAD
 	git pull
@@ -325,7 +352,7 @@ function Get-MSMFA {
 	Get-MFA -OutputDir "$env:USERPROFILE\Desktop\$projectname\MFA"
 
 	#Change directory to the analyzer suite
-   	Push-Location "$env:USERPROFILE\Documents\PSScripts\MAS\"
+    Push-Location "$env:USERPROFILE\Documents\PSScripts\MAS\"
 
 	#MFA-Analyzer does not have -Path support
 	Write-Host "You will need to select the YYYYMMDDTTTT-MFA-AuthenticationMethods.csv file to use with MFA-Analyser" -ForegroundColor Red
@@ -457,7 +484,7 @@ function Get-MS-Oauth {
 
 
 ####
-#### 6
+#### 7
 ####
 function Get-MSRiskyDetections {
 
@@ -498,7 +525,7 @@ function Get-MSRiskyDetections {
 }
 
 ####
-#### 7
+#### 8
 ####
 function Get-MS-MailboxRulesOrg {
 
@@ -526,7 +553,7 @@ function Get-MS-MailboxRulesOrg {
 }
 
 ####
-#### 8
+#### 9
 ####
 function Get-UAL-User {
 
@@ -558,7 +585,7 @@ function Get-UAL-User {
 }
 
 ####
-#### 9
+#### 10
 ####
 function Get-MS-MailboxItemsAccessed {
 
@@ -587,7 +614,7 @@ function Get-MS-MailboxItemsAccessed {
 }
 
 ####
-#### 10
+#### 11
 ####
 function Get-MS-MailboxRulesUser {
 
@@ -614,7 +641,7 @@ function Get-MS-MailboxRulesUser {
 }
 
 ####
-#### 11
+#### 6
 ####
 function Get-MS-MTL {
 
@@ -646,9 +673,6 @@ function Get-MS-MTL {
 	Read-Host -Prompt "Press any key to return to the Main Menu or CTRL+C to quit" | Out-Null 	 
 }
 
-####
-#### 12
-####
 function Get-MS-AllTheThings {
 
 	Write-Host "This script will automatically download all data and analyse where possible" -ForegroundColor DarkGreen -BackgroundColor DarkRed
